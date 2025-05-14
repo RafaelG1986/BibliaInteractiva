@@ -13,6 +13,7 @@ import EditarVersiculo from './versiculos/EditarVersiculo';
 import CapitulosList from './capitulos/CapitulosList';
 import NuevoCapitulo from './capitulos/NuevoCapitulo';
 import EditarCapitulo from './capitulos/EditarCapitulo';
+import CargaMasivaVersiculos from './versiculos/CargaMasivaVersiculos';
 
 const Stack = createStackNavigator();
 
@@ -85,6 +86,11 @@ const AdminNavigator = () => {
         name="EditarVersiculo" 
         component={EditarVersiculo} 
         options={{ headerTitle: 'Editar Versículo' }}
+      />
+      <Stack.Screen 
+        name="CargaMasivaVersiculos" 
+        component={CargaMasivaVersiculos} 
+        options={{ headerTitle: 'Carga Masiva de Versículos' }}
       />
 
       {/* Rutas para Capítulos */}

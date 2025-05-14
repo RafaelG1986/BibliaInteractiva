@@ -120,14 +120,25 @@ const VersiculosList = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Gestionar Versículos</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => navigation.navigate('NuevoVersiculo', { capituloId: selectedCapituloId })}
-          disabled={!selectedCapituloId}
-        >
-          <Ionicons name="add" size={24} color="white" />
-          <Text style={styles.addButtonText}>Nuevo</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          {selectedCapituloId && (
+            <TouchableOpacity 
+              style={styles.massImportButton}
+              onPress={() => navigation.navigate('CargaMasivaVersiculos', { capituloId: selectedCapituloId })}
+            >
+              <Ionicons name="document-text" size={20} color="white" />
+              <Text style={styles.massImportButtonText}>Carga Masiva</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('NuevoVersiculo', { capituloId: selectedCapituloId })}
+            disabled={!selectedCapituloId}
+          >
+            <Ionicons name="add" size={24} color="white" />
+            <Text style={styles.addButtonText}>Nuevo</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Selector de Libro */}
@@ -271,6 +282,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,6 +298,21 @@ const styles = StyleSheet.create({
     color: 'white',
     marginLeft: 4,
     fontWeight: 'bold',
+  },
+  massImportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#32a852',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  massImportButtonText: {
+    color: 'white',
+    marginLeft: 4,
+    fontWeight: '500',
+    fontSize: 12,
   },
   selectorContainer: {
     marginBottom: 16,
