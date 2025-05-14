@@ -25,9 +25,20 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.adminButtonText}>Gestionar Libros</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.adminButton}>
-          <Ionicons name="document-text" size={24} color="white" style={styles.buttonIcon} />
+        <TouchableOpacity 
+          style={styles.adminButton}
+          onPress={() => navigation.navigate('CapitulosList')}
+        >
+          <Ionicons name="bookmark" size={24} color="white" style={styles.buttonIcon} />
           <Text style={styles.adminButtonText}>Gestionar Capítulos</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.adminButton}
+          onPress={() => navigation.navigate('VersiculosList')}
+        >
+          <Ionicons name="document-text" size={24} color="white" style={styles.buttonIcon} />
+          <Text style={styles.adminButtonText}>Gestionar Versículos</Text>
         </TouchableOpacity>
       </View>
     </View>

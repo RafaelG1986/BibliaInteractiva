@@ -7,6 +7,12 @@ import EditarVersion from './versiones/EditarVersion';
 import LibrosList from './libros/LibrosList';
 import NuevoLibro from './libros/NuevoLibro';
 import EditarLibro from './libros/EditarLibro';
+import VersiculosList from './versiculos/VersiculosList';
+import NuevoVersiculo from './versiculos/NuevoVersiculo';
+import EditarVersiculo from './versiculos/EditarVersiculo';
+import CapitulosList from './capitulos/CapitulosList';
+import NuevoCapitulo from './capitulos/NuevoCapitulo';
+import EditarCapitulo from './capitulos/EditarCapitulo';
 
 const Stack = createStackNavigator();
 
@@ -29,6 +35,7 @@ const AdminNavigator = () => {
         component={AdminScreen} 
         options={{ headerTitle: 'Administración' }}
       />
+      
       {/* Rutas para Versiones */}
       <Stack.Screen 
         name="VersionesList" 
@@ -61,6 +68,40 @@ const AdminNavigator = () => {
         name="EditarLibro" 
         component={EditarLibro} 
         options={{ headerTitle: 'Editar Libro' }}
+      />
+      
+      {/* Rutas para Versículos */}
+      <Stack.Screen 
+        name="VersiculosList" 
+        component={VersiculosList} 
+        options={{ headerTitle: 'Versículos' }}
+      />
+      <Stack.Screen 
+        name="NuevoVersiculo" 
+        component={NuevoVersiculo} 
+        options={{ headerTitle: 'Nuevo Versículo' }}
+      />
+      <Stack.Screen 
+        name="EditarVersiculo" 
+        component={EditarVersiculo} 
+        options={{ headerTitle: 'Editar Versículo' }}
+      />
+
+      {/* Rutas para Capítulos */}
+      <Stack.Screen 
+        name="CapitulosList" 
+        component={CapitulosList} 
+        options={{ headerTitle: 'Gestionar Capítulos' }}
+      />
+      <Stack.Screen 
+        name="NuevoCapitulo" 
+        component={NuevoCapitulo} 
+        options={{ headerTitle: 'Nuevo Capítulo' }}
+      />
+      <Stack.Screen 
+        name="EditarCapitulo" 
+        component={EditarCapitulo} 
+        options={{ headerTitle: 'Editar Capítulo' }}
       />
     </Stack.Navigator>
   );

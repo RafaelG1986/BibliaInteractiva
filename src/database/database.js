@@ -25,6 +25,28 @@ const initDatabase = async () => {
       await AsyncStorage.setItem('libros', JSON.stringify(libros));
     }
     
+    // Estructura inicial para capítulos
+    const existingCapitulos = await AsyncStorage.getItem('capitulos');
+    if (!existingCapitulos) {
+      const capitulos = [
+        { id: 1, libro_id: 1, numero: 1 },
+        { id: 2, libro_id: 1, numero: 2 },
+        { id: 3, libro_id: 1, numero: 3 }
+      ];
+      await AsyncStorage.setItem('capitulos', JSON.stringify(capitulos));
+    }
+    
+    // Estructura inicial para versículos
+    const existingVersiculos = await AsyncStorage.getItem('versiculos');
+    if (!existingVersiculos) {
+      const versiculos = [
+        { id: 1, capitulo_id: 1, numero: 1, texto: 'En el principio creó Dios los cielos y la tierra.' },
+        { id: 2, capitulo_id: 1, numero: 2, texto: 'Y la tierra estaba desordenada y vacía, y las tinieblas estaban sobre la faz del abismo, y el Espíritu de Dios se movía sobre la faz de las aguas.' },
+        { id: 3, capitulo_id: 1, numero: 3, texto: 'Y dijo Dios: Sea la luz; y fue la luz.' }
+      ];
+      await AsyncStorage.setItem('versiculos', JSON.stringify(versiculos));
+    }
+    
     console.log('Base de datos inicializada correctamente');
     return true;
   } catch (error) {
@@ -113,6 +135,99 @@ const db = {
     const libros = await db.getLibros();
     const newLibros = libros.filter(l => l.id !== id);
     await AsyncStorage.setItem('libros', JSON.stringify(newLibros));
+    return id;
+  },
+  
+  // Capítulos
+  getCapitulos: async () => {
+    const data = await AsyncStorage.getItem('capitulos');
+    return data ? JSON.parse(data) : [];
+  },
+  
+  getCapitulosByLibro: async (libroId) => {
+    const capitulos = await db.getCapitulos();
+    return capitulos.filter(c => c.libro_id === libroId).sort((a, b) => a.numero - b.numero);
+  },
+  
+  getCapituloById: async (id) => {
+    const capitulos = await db.getCapitulos();
+    return capitulos.find(c => c.id === id);
+  },
+  
+  addCapitulo: async (capitulo) => {
+    const capitulos = await db.getCapitulos();
+    const newId = capitulos.length > 0 ? Math.max(...capitulos.map(c => c.id)) + 1 : 1;
+    const newCapitulo = { id: newId, ...capitulo };
+    capitulos.push(newCapitulo);
+    await AsyncStorage.setItem('capitulos', JSON.stringify(capitulos));
+    return newCapitulo;
+  },
+  
+  updateCapitulo: async (id, capitulo) => {
+    const capitulos = await db.getCapitulos();
+    const index = capitulos.findIndex(c => c.id === id);
+    if (index !== -1) {
+      capitulos[index] = { ...capitulos[index], ...capitulo };
+      await AsyncStorage.setItem('capitulos', JSON.stringify(capitulos));
+      return capitulos[index];
+    }
+    return null;
+  },
+  
+  deleteCapitulo: async (id) => {
+    const capitulos = await db.getCapitulos();
+    const newCapitulos = capitulos.filter(c => c.id !== id);
+    await AsyncStorage.setItem('capitulos', JSON.stringify(newCapitulos));
+    
+    // También eliminar versículos relacionados con este capítulo
+    const versiculos = await db.getVersiculos();
+    const newVersiculos = versiculos.filter(v => v.capitulo_id !== id);
+    await AsyncStorage.setItem('versiculos', JSON.stringify(newVersiculos));
+    
+    return id;
+  },
+  
+  // Versículos
+  getVersiculos: async () => {
+    const data = await AsyncStorage.getItem('versiculos');
+    return data ? JSON.parse(data) : [];
+  },
+  
+  getVersiculosByCapitulo: async (capituloId) => {
+    const versiculos = await db.getVersiculos();
+    return versiculos.filter(v => v.capitulo_id === capituloId)
+      .sort((a, b) => a.numero - b.numero);
+  },
+  
+  getVersiculoById: async (id) => {
+    const versiculos = await db.getVersiculos();
+    return versiculos.find(v => v.id === id);
+  },
+  
+  addVersiculo: async (versiculo) => {
+    const versiculos = await db.getVersiculos();
+    const newId = versiculos.length > 0 ? Math.max(...versiculos.map(v => v.id)) + 1 : 1;
+    const newVersiculo = { id: newId, ...versiculo };
+    versiculos.push(newVersiculo);
+    await AsyncStorage.setItem('versiculos', JSON.stringify(versiculos));
+    return newVersiculo;
+  },
+  
+  updateVersiculo: async (id, versiculo) => {
+    const versiculos = await db.getVersiculos();
+    const index = versiculos.findIndex(v => v.id === id);
+    if (index !== -1) {
+      versiculos[index] = { ...versiculos[index], ...versiculo };
+      await AsyncStorage.setItem('versiculos', JSON.stringify(versiculos));
+      return versiculos[index];
+    }
+    return null;
+  },
+  
+  deleteVersiculo: async (id) => {
+    const versiculos = await db.getVersiculos();
+    const newVersiculos = versiculos.filter(v => v.id !== id);
+    await AsyncStorage.setItem('versiculos', JSON.stringify(newVersiculos));
     return id;
   }
 };
