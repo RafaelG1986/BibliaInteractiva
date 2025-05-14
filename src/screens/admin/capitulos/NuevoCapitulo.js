@@ -1,55 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
   Alert,
+  ScrollView,
   ActivityIndicator
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../../database/database';
 
 const NuevoCapitulo = ({ navigation, route }) => {
-  const { libroId } = route.params || {};
+  const { libroId: libroIdParam } = route.params || {};
   
   const [numero, setNumero] = useState('');
-  const [selectedLibroId, setSelectedLibroId] = useState(libroId || null);
+  const [versiones, setVersiones] = useState([]);
+  const [selectedVersionId, setSelectedVersionId] = useState(null);
   const [libros, setLibros] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingLibros, setLoadingLibros] = useState(true);
-  
+  const [selectedLibroId, setSelectedLibroId] = useState(libroIdParam || null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
-    const cargarLibros = async () => {
+    const cargarDatos = async () => {
       try {
-        // Cargar libros de la versión 1 por defecto
-        const data = await db.getLibrosByVersion(1);
-        setLibros(data);
-        if (data.length > 0 && !selectedLibroId) {
-          setSelectedLibroId(data[0].id);
+        setLoading(true);
+        
+        // Cargar versiones
+        const versionesData = await db.getVersiones();
+        setVersiones(versionesData);
+        
+        if (versionesData.length > 0) {
+          // Si ya tenemos un libroId, necesitamos obtener su versionId
+          if (libroIdParam) {
+            const libro = await db.getLibroById(libroIdParam);
+            if (libro) {
+              setSelectedVersionId(libro.version_id);
+              setSelectedLibroId(libroIdParam);
+              
+              // Cargar libros de esa versión
+              const librosData = await db.getLibrosByVersion(libro.version_id);
+              setLibros(librosData);
+            } else {
+              // Si no se encuentra el libro, usar la primera versión
+              setSelectedVersionId(versionesData[0].id);
+              const librosData = await db.getLibrosByVersion(versionesData[0].id);
+              setLibros(librosData);
+              if (librosData.length > 0) {
+                setSelectedLibroId(librosData[0].id);
+              }
+            }
+          } else {
+            // Si no hay libroId, usar primera versión y cargar sus libros
+            setSelectedVersionId(versionesData[0].id);
+            const librosData = await db.getLibrosByVersion(versionesData[0].id);
+            setLibros(librosData);
+            if (librosData.length > 0) {
+              setSelectedLibroId(librosData[0].id);
+            }
+          }
         }
       } catch (error) {
-        console.error('Error al cargar libros:', error);
-        Alert.alert('Error', 'No se pudieron cargar los libros');
+        console.error('Error al cargar datos:', error);
+        Alert.alert('Error', 'No se pudieron cargar los datos necesarios');
       } finally {
-        setLoadingLibros(false);
+        setLoading(false);
       }
     };
+    
+    cargarDatos();
+  }, [libroIdParam]);
 
-    cargarLibros();
-  }, []);
-  
-  // Función para verificar si ya existe un capítulo con ese número en el libro
-  const existeCapitulo = async (libroId, numCapitulo) => {
-    const capitulos = await db.getCapitulosByLibro(libroId);
-    return capitulos.some(cap => cap.numero === numCapitulo);
+  const cargarLibrosPorVersion = async (versionId) => {
+    try {
+      setLoading(true);
+      const librosData = await db.getLibrosByVersion(versionId);
+      setLibros(librosData);
+      
+      if (librosData.length > 0) {
+        setSelectedLibroId(librosData[0].id);
+      } else {
+        setSelectedLibroId(null);
+      }
+    } catch (error) {
+      console.error('Error al cargar libros:', error);
+      Alert.alert('Error', 'No se pudieron cargar los libros');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cambiarVersion = (versionId) => {
+    setSelectedVersionId(versionId);
+    cargarLibrosPorVersion(versionId);
   };
 
   const validarFormulario = () => {
-    if (!numero.trim() || isNaN(Number(numero)) || Number(numero) <= 0) {
-      Alert.alert('Error', 'El número de capítulo debe ser un número positivo');
+    if (!numero.trim() || isNaN(parseInt(numero))) {
+      Alert.alert('Error', 'El número de capítulo debe ser un valor numérico');
       return false;
     }
     if (!selectedLibroId) {
@@ -59,64 +109,43 @@ const NuevoCapitulo = ({ navigation, route }) => {
     return true;
   };
 
-  const guardarCapitulo = async () => {
+  const handleSubmit = async () => {
     if (!validarFormulario()) return;
 
-    const numCapitulo = parseInt(numero);
-    
     try {
-      // Verificar si ya existe un capítulo con ese número
-      const existe = await existeCapitulo(selectedLibroId, numCapitulo);
-      if (existe) {
-        Alert.alert('Error', `Ya existe un capítulo ${numCapitulo} en este libro`);
+      setSubmitting(true);
+      
+      // Verificar si el capítulo ya existe
+      const capitulos = await db.getCapitulosByLibro(selectedLibroId);
+      const capituloExistente = capitulos.find(c => c.numero === parseInt(numero));
+      
+      if (capituloExistente) {
+        Alert.alert('Error', `El capítulo ${numero} ya existe para este libro`);
+        setSubmitting(false);
         return;
       }
       
-      setLoading(true);
-      
-      const nuevoCapitulo = {
+      await db.addCapitulo({
         libro_id: selectedLibroId,
-        numero: numCapitulo
-      };
+        numero: parseInt(numero)
+      });
       
-      await db.addCapitulo(nuevoCapitulo);
-      
-      Alert.alert('Éxito', 'Capítulo añadido correctamente', [
-        { 
-          text: 'OK', 
-          onPress: () => navigation.goBack() 
-        }
+      Alert.alert('Éxito', 'Capítulo creado correctamente', [
+        { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
       console.error('Error al guardar capítulo:', error);
       Alert.alert('Error', 'No se pudo guardar el capítulo');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  if (loadingLibros) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4a90e2" />
-        <Text style={styles.loadingText}>Cargando libros...</Text>
-      </View>
-    );
-  }
-
-  if (libros.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>No hay libros disponibles</Text>
-        <Text style={styles.subtitle}>
-          Necesitas crear al menos un libro antes de añadir capítulos.
-        </Text>
-        <TouchableOpacity
-          style={styles.createLibroButton}
-          onPress={() => navigation.navigate('LibrosList')}
-        >
-          <Text style={styles.createLibroButtonText}>Ir a Gestionar Libros</Text>
-        </TouchableOpacity>
+        <Text style={styles.loadingText}>Cargando datos...</Text>
       </View>
     );
   }
@@ -126,26 +155,58 @@ const NuevoCapitulo = ({ navigation, route }) => {
       <Text style={styles.title}>Nuevo Capítulo</Text>
       
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Libro *</Text>
+        <Text style={styles.label}>Versión Bíblica:</Text>
         <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedLibroId}
-            onValueChange={(itemValue) => setSelectedLibroId(itemValue)}
-            style={styles.picker}
-          >
-            {libros.map(libro => (
-              <Picker.Item 
-                key={libro.id} 
-                label={`${libro.nombre} (${libro.abreviatura})`} 
-                value={libro.id} 
-              />
-            ))}
-          </Picker>
+          {versiones.length > 0 ? (
+            <Picker
+              selectedValue={selectedVersionId}
+              onValueChange={cambiarVersion}
+              style={styles.picker}
+            >
+              {versiones.map(version => (
+                <Picker.Item 
+                  key={version.id} 
+                  label={`${version.nombre} (${version.abreviatura})`} 
+                  value={version.id} 
+                />
+              ))}
+            </Picker>
+          ) : (
+            <Text style={styles.noDataText}>
+              No hay versiones disponibles. Cree una versión primero.
+            </Text>
+          )}
         </View>
       </View>
       
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Número de capítulo *</Text>
+        <Text style={styles.label}>Libro:</Text>
+        <View style={styles.pickerContainer}>
+          {libros.length > 0 ? (
+            <Picker
+              selectedValue={selectedLibroId}
+              onValueChange={(value) => setSelectedLibroId(value)}
+              style={styles.picker}
+              enabled={libros.length > 0}
+            >
+              {libros.map(libro => (
+                <Picker.Item 
+                  key={libro.id} 
+                  label={libro.nombre} 
+                  value={libro.id} 
+                />
+              ))}
+            </Picker>
+          ) : (
+            <Text style={styles.noDataText}>
+              No hay libros disponibles para esta versión.
+            </Text>
+          )}
+        </View>
+      </View>
+      
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Número de Capítulo:</Text>
         <TextInput
           style={styles.input}
           value={numero}
@@ -155,27 +216,20 @@ const NuevoCapitulo = ({ navigation, route }) => {
         />
       </View>
       
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={guardarCapitulo}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text style={styles.submitButtonText}>Guardar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.button, 
+          (submitting || !selectedLibroId) && styles.disabledButton
+        ]}
+        onPress={handleSubmit}
+        disabled={submitting || !selectedLibroId}
+      >
+        {submitting ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Guardar Capítulo</Text>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -200,46 +254,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
     marginBottom: 20,
-  },
-  createLibroButton: {
-    backgroundColor: '#4a90e2',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  createLibroButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   formGroup: {
     marginBottom: 16,
   },
   label: {
     fontSize: 16,
-    marginBottom: 6,
-    color: '#555',
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#444',
   },
   input: {
-    backgroundColor: 'white',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
+    borderRadius: 6,
+    padding: 12,
     fontSize: 16,
   },
   pickerContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#ddd',
     overflow: 'hidden',
@@ -247,41 +284,27 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 30,
-    marginBottom: 40,
+  noDataText: {
+    padding: 15,
+    color: '#e74c3c',
+    fontStyle: 'italic',
   },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    flex: 1,
-    marginLeft: 10,
+  button: {
+    backgroundColor: '#4a90e2',
+    padding: 14,
+    borderRadius: 6,
     alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 30,
   },
-  submitButtonText: {
-    color: 'white',
+  buttonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cancelButtonText: {
-    color: '#777',
-    fontSize: 16,
-  },
+  disabledButton: {
+    backgroundColor: '#a0a0a0',
+  }
 });
 
 export default NuevoCapitulo;

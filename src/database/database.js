@@ -229,6 +229,73 @@ const db = {
     const newVersiculos = versiculos.filter(v => v.id !== id);
     await AsyncStorage.setItem('versiculos', JSON.stringify(newVersiculos));
     return id;
+  },
+
+  // Función para copiar libros de una versión a otra
+  copyLibrosToVersion: async (sourceVersionId, targetVersionId, copyContent = false) => {
+    try {
+      // Obtener libros de la versión fuente
+      const libros = await db.getLibros();
+      const librosSource = libros.filter(l => l.version_id === sourceVersionId);
+      
+      if (librosSource.length === 0) {
+        throw new Error('La versión origen no tiene libros para copiar');
+      }
+      
+      // Mapa para mantener relación entre IDs originales y nuevos
+      const libroIdMap = {};
+      const capituloIdMap = {};
+      
+      // Copiar cada libro a la versión destino
+      for (const libro of librosSource) {
+        const newLibro = await db.addLibro({
+          version_id: targetVersionId,
+          nombre: libro.nombre,
+          abreviatura: libro.abreviatura,
+          testamento: libro.testamento,
+          orden: libro.orden
+        });
+        
+        libroIdMap[libro.id] = newLibro.id;
+        
+        // Si se solicita copiar también el contenido
+        if (copyContent) {
+          // Obtener capítulos del libro original
+          const capitulos = await db.getCapitulosByLibro(libro.id);
+          
+          for (const capitulo of capitulos) {
+            const newCapitulo = await db.addCapitulo({
+              libro_id: newLibro.id,
+              numero: capitulo.numero
+            });
+            
+            capituloIdMap[capitulo.id] = newCapitulo.id;
+            
+            // Copiar versículos
+            const versiculos = await db.getVersiculosByCapitulo(capitulo.id);
+            
+            for (const versiculo of versiculos) {
+              await db.addVersiculo({
+                capitulo_id: newCapitulo.id,
+                numero: versiculo.numero,
+                texto: versiculo.texto
+              });
+            }
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        librosCopied: Object.keys(libroIdMap).length,
+        capitulosCopied: Object.keys(capituloIdMap).length,
+        libroIdMap,
+        capituloIdMap
+      };
+    } catch (error) {
+      console.error('Error al copiar libros entre versiones:', error);
+      throw error;
+    }
   }
 };
 

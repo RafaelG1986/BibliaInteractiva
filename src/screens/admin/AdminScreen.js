@@ -40,6 +40,14 @@ const AdminScreen = ({ navigation }) => {
           <Ionicons name="document-text" size={24} color="white" style={styles.buttonIcon} />
           <Text style={styles.adminButtonText}>Gestionar Versículos</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.adminButton, styles.integratedButton]}
+          onPress={() => navigation.navigate('GestorBiblicoIntegrado')}
+        >
+          <Ionicons name="layers" size={24} color="white" style={styles.buttonIcon} />
+          <Text style={styles.adminButtonText}>Gestor Integrado</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -75,6 +83,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  integratedButton: {
+    backgroundColor: '#8e44ad', // Color diferente para destacar el gestor integrado
+    marginTop: 10, // Espacio adicional para separarlo visualmente
   },
   buttonIcon: {
     marginRight: 10,

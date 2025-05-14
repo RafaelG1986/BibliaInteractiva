@@ -10,6 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { db } from '../../../database/database';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const EditarVersion = ({ navigation, route }) => {
   const { versionId } = route.params;
@@ -146,6 +147,14 @@ const EditarVersion = ({ navigation, route }) => {
           numberOfLines={4}
         />
       </View>
+
+      <TouchableOpacity 
+        style={styles.copyBooksButton}
+        onPress={() => navigation.navigate('CopiarLibros', { targetVersionId: versionId })}
+      >
+        <Ionicons name="copy-outline" size={20} color="white" />
+        <Text style={styles.copyBooksButtonText}>Copiar libros de otra versión</Text>
+      </TouchableOpacity>
       
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -250,6 +259,22 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#777',
     fontSize: 16,
+  },
+  copyBooksButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4a90e2',
+    padding: 14,
+    borderRadius: 6,
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  copyBooksButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 

@@ -17,6 +17,7 @@ const NuevaVersion = ({ navigation }) => {
   const [idioma, setIdioma] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const validarFormulario = () => {
     if (!nombre.trim()) {
@@ -34,32 +35,40 @@ const NuevaVersion = ({ navigation }) => {
     return true;
   };
 
-  const guardarVersion = async () => {
-    if (!validarFormulario()) return;
+  const handleSubmit = async () => {
+    // Validación
+    if (!nombre.trim() || !abreviatura.trim() || !idioma.trim()) {
+      Alert.alert('Error', 'Todos los campos son requeridos');
+      return;
+    }
 
     try {
-      setLoading(true);
-      
-      const nuevaVersion = {
+      setSubmitting(true);
+      const newVersion = await db.addVersion({
         nombre,
         abreviatura,
-        idioma,
-        descripcion
-      };
+        idioma
+      });
       
-      await db.addVersion(nuevaVersion);
-      
-      Alert.alert('Éxito', 'Versión añadida correctamente', [
-        { 
-          text: 'OK', 
-          onPress: () => navigation.goBack() 
-        }
-      ]);
+      Alert.alert(
+        'Éxito', 
+        '¿Desea copiar libros de otra versión bíblica a esta nueva versión?',
+        [
+          {
+            text: 'No, más tarde',
+            onPress: () => navigation.goBack()
+          },
+          {
+            text: 'Sí, copiar libros',
+            onPress: () => navigation.replace('CopiarLibros', { targetVersionId: newVersion.id })
+          }
+        ]
+      );
     } catch (error) {
       console.error('Error al guardar versión:', error);
       Alert.alert('Error', 'No se pudo guardar la versión');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -114,17 +123,17 @@ const NuevaVersion = ({ navigation }) => {
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
-          disabled={loading}
+          disabled={loading || submitting}
         >
           <Text style={styles.cancelButtonText}>Cancelar</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.submitButton}
-          onPress={guardarVersion}
-          disabled={loading}
+          onPress={handleSubmit}
+          disabled={loading || submitting}
         >
-          {loading ? (
+          {loading || submitting ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
             <Text style={styles.submitButtonText}>Guardar</Text>

@@ -1,64 +1,126 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { db } from '../../../database/database';
 
-const CapitulosList = ({ navigation, route }) => {
-  const [libros, setLibros] = useState([]);
+const CapitulosList = ({ navigation }) => {
   const [capitulos, setCapitulos] = useState([]);
-  const [selectedLibro, setSelectedLibro] = useState(null);
+  const [libros, setLibros] = useState([]);
+  const [versiones, setVersiones] = useState([]);
+  const [selectedVersionId, setSelectedVersionId] = useState(null);
+  const [selectedLibroId, setSelectedLibroId] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  const cargarLibros = async () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    cargarVersiones();
+    
+    // Actualizar al volver a la pantalla
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (selectedVersionId) {
+        cargarLibrosPorVersion(selectedVersionId);
+        if (selectedLibroId) {
+          cargarCapitulosPorLibro(selectedLibroId);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Cargar versiones bíblicas disponibles
+  const cargarVersiones = async () => {
     try {
-      // Por defecto cargamos la versión con ID 1
-      const data = await db.getLibrosByVersion(1);
-      setLibros(data);
+      setLoading(true);
+      const versionesData = await db.getVersiones();
+      setVersiones(versionesData);
       
-      if (data.length > 0) {
-        const libroId = route.params?.libroId || data[0].id;
-        setSelectedLibro(libroId);
-        cargarCapitulos(libroId);
+      if (versionesData.length > 0) {
+        setSelectedVersionId(versionesData[0].id);
+        await cargarLibrosPorVersion(versionesData[0].id);
       } else {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error al cargar libros:', error);
+      console.error('Error al cargar versiones:', error);
+      Alert.alert('Error', 'No se pudieron cargar las versiones bíblicas');
       setLoading(false);
     }
   };
-  
-  const cargarCapitulos = async (libroId) => {
+
+  // Cargar libros de una versión específica
+  const cargarLibrosPorVersion = async (versionId) => {
     try {
-      setLoading(true);
-      const data = await db.getCapitulosByLibro(libroId || selectedLibro);
-      setCapitulos(data);
+      const librosData = await db.getLibrosByVersion(versionId);
+      setLibros(librosData);
+      
+      if (librosData.length > 0) {
+        setSelectedLibroId(librosData[0].id);
+        await cargarCapitulosPorLibro(librosData[0].id);
+      } else {
+        setCapitulos([]);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error al cargar libros:', error);
+      Alert.alert('Error', 'No se pudieron cargar los libros');
+      setLoading(false);
+    }
+  };
+
+  // Cargar capítulos de un libro específico
+  const cargarCapitulosPorLibro = async (libroId) => {
+    try {
+      setRefreshing(true);
+      const capitulosData = await db.getCapitulosByLibro(libroId);
+      
+      // Enriquecer datos con información del libro
+      const capitulosEnriquecidos = await Promise.all(capitulosData.map(async (capitulo) => {
+        const libro = await db.getLibroById(capitulo.libro_id);
+        return {
+          ...capitulo,
+          libroNombre: libro ? libro.nombre : 'Desconocido'
+        };
+      }));
+      
+      setCapitulos(capitulosEnriquecidos);
+      setRefreshing(false);
+      setLoading(false);
     } catch (error) {
       console.error('Error al cargar capítulos:', error);
       Alert.alert('Error', 'No se pudieron cargar los capítulos');
-    } finally {
+      setRefreshing(false);
       setLoading(false);
     }
   };
-  
-  useEffect(() => {
-    cargarLibros();
-    
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (selectedLibro) {
-        cargarCapitulos(selectedLibro);
-      } else {
-        cargarLibros();
-      }
-    });
-    
-    return unsubscribe;
-  }, [navigation]);
-  
-  const eliminarCapitulo = async (id) => {
+
+  // Cambiar la versión seleccionada
+  const handleCambiarVersion = (versionId) => {
+    setSelectedVersionId(versionId);
+    cargarLibrosPorVersion(versionId);
+  };
+
+  // Cambiar el libro seleccionado
+  const handleCambiarLibro = (libroId) => {
+    setSelectedLibroId(libroId);
+    cargarCapitulosPorLibro(libroId);
+  };
+
+  // Eliminar un capítulo
+  const handleEliminarCapitulo = async (id) => {
     Alert.alert(
       'Confirmar eliminación',
-      '¿Estás seguro de que quieres eliminar este capítulo? Se eliminarán todos los versículos asociados.',
+      '¿Está seguro de que desea eliminar este capítulo? Esta acción eliminará también todos los versículos asociados.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -67,7 +129,7 @@ const CapitulosList = ({ navigation, route }) => {
           onPress: async () => {
             try {
               await db.deleteCapitulo(id);
-              cargarCapitulos(selectedLibro);
+              setCapitulos(capitulos.filter(c => c.id !== id));
               Alert.alert('Éxito', 'Capítulo eliminado correctamente');
             } catch (error) {
               console.error('Error al eliminar capítulo:', error);
@@ -78,116 +140,129 @@ const CapitulosList = ({ navigation, route }) => {
       ]
     );
   };
-  
-  const cambiarLibro = (libroId) => {
-    setSelectedLibro(libroId);
-    cargarCapitulos(libroId);
+
+  // Navegación a la pantalla de edición
+  const handleEditarCapitulo = (capitulo) => {
+    navigation.navigate('EditarCapitulo', { id: capitulo.id });
   };
-  
-  if (loading && !capitulos.length) {
+
+  // Renderizar un ítem de la lista
+  const renderItem = ({ item }) => (
+    <View style={styles.capituloItem}>
+      <View style={styles.capituloInfo}>
+        <Text style={styles.capituloNumero}>Capítulo {item.numero}</Text>
+        <Text style={styles.libroNombre}>{item.libroNombre}</Text>
+      </View>
+      
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => handleEditarCapitulo(item)}
+        >
+          <Ionicons name="create-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleEliminarCapitulo(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4a90e2" />
-        <Text style={styles.loadingText}>Cargando...</Text>
+        <Text style={styles.loadingText}>Cargando capítulos...</Text>
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Gestionar Capítulos</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => navigation.navigate('NuevoCapitulo', { libroId: selectedLibro })}
-        >
-          <Ionicons name="add" size={24} color="white" />
-          <Text style={styles.addButtonText}>Nuevo</Text>
-        </TouchableOpacity>
+      <View style={styles.selectors}>
+        {/* Selector de Versión */}
+        <View style={styles.selectorContainer}>
+          <Text style={styles.selectorLabel}>Versión:</Text>
+          <View style={styles.pickerContainer}>
+            {versiones.length > 0 ? (
+              <Picker
+                selectedValue={selectedVersionId}
+                onValueChange={handleCambiarVersion}
+                style={styles.picker}
+              >
+                {versiones.map(version => (
+                  <Picker.Item 
+                    key={version.id} 
+                    label={`${version.nombre} (${version.abreviatura})`} 
+                    value={version.id} 
+                  />
+                ))}
+              </Picker>
+            ) : (
+              <Text style={styles.noDataText}>No hay versiones disponibles</Text>
+            )}
+          </View>
+        </View>
+        
+        {/* Selector de Libro */}
+        <View style={styles.selectorContainer}>
+          <Text style={styles.selectorLabel}>Libro:</Text>
+          <View style={styles.pickerContainer}>
+            {libros.length > 0 ? (
+              <Picker
+                selectedValue={selectedLibroId}
+                onValueChange={handleCambiarLibro}
+                style={styles.picker}
+                enabled={libros.length > 0}
+              >
+                {libros.map(libro => (
+                  <Picker.Item 
+                    key={libro.id} 
+                    label={libro.nombre} 
+                    value={libro.id} 
+                  />
+                ))}
+              </Picker>
+            ) : (
+              <Text style={styles.noDataText}>
+                No hay libros para esta versión
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
       
-      {/* Selector de libro */}
-      {libros.length > 0 ? (
-        <View style={styles.libroSelector}>
-          <Text style={styles.selectorLabel}>Libro:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {libros.map(libro => (
-              <TouchableOpacity
-                key={libro.id}
-                style={[
-                  styles.libroButton,
-                  selectedLibro === libro.id && styles.selectedLibro
-                ]}
-                onPress={() => cambiarLibro(libro.id)}
-              >
-                <Text 
-                  style={[
-                    styles.libroButtonText,
-                    selectedLibro === libro.id && styles.selectedLibroText
-                  ]}
-                >
-                  {libro.abreviatura}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+      {capitulos.length > 0 ? (
+        <FlatList
+          data={capitulos}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          refreshing={refreshing}
+          onRefresh={() => cargarCapitulosPorLibro(selectedLibroId)}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        />
       ) : (
-        <View style={styles.noLibros}>
-          <Text style={styles.noLibrosText}>
-            No hay libros disponibles. Por favor, crea un libro primero.
+        <View style={styles.emptyState}>
+          <Ionicons name="book-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyStateText}>
+            No hay capítulos para este libro
           </Text>
-          <TouchableOpacity
-            style={styles.createLibroButton}
-            onPress={() => navigation.navigate('LibrosList')}
-          >
-            <Text style={styles.createLibroButtonText}>Ir a Gestionar Libros</Text>
-          </TouchableOpacity>
         </View>
       )}
       
-      {/* Lista de capítulos */}
-      {selectedLibro && (
-        <FlatList
-          data={capitulos}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.capituloItem}>
-              <View style={styles.capituloInfo}>
-                <Text style={styles.capituloName}>Capítulo {item.numero}</Text>
-              </View>
-              <View style={styles.actions}>
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.viewButton]}
-                  onPress={() => navigation.navigate('VersiculosList', { capituloId: item.id })}
-                >
-                  <Ionicons name="book-outline" size={22} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.editButton]}
-                  onPress={() => navigation.navigate('EditarCapitulo', { capituloId: item.id })}
-                >
-                  <Ionicons name="create-outline" size={22} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => eliminarCapitulo(item.id)}
-                >
-                  <Ionicons name="trash-outline" size={22} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          contentContainerStyle={styles.list}
-          refreshing={loading}
-          onRefresh={() => cargarCapitulos(selectedLibro)}
-          ListEmptyComponent={
-            <Text style={styles.emptyMessage}>
-              No hay capítulos disponibles para este libro
-            </Text>
-          }
-        />
-      )}
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => navigation.navigate('NuevoCapitulo', { 
+          libroId: selectedLibroId 
+        })}
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -196,118 +271,81 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 16,
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
     color: '#666',
+    fontSize: 16,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  selectors: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4a90e2',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  addButtonText: {
-    color: 'white',
-    marginLeft: 4,
-    fontWeight: 'bold',
-  },
-  libroSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+  selectorContainer: {
+    marginBottom: 12,
   },
   selectorLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginRight: 10,
+    color: '#444',
+    marginBottom: 6,
   },
-  libroButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  selectedLibro: {
-    backgroundColor: '#4a90e2',
-  },
-  libroButtonText: {
-    color: '#333',
-    fontWeight: '500',
-  },
-  selectedLibroText: {
-    color: 'white',
-  },
-  noLibros: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  noLibrosText: {
-    textAlign: 'center',
-    marginBottom: 16,
-    color: '#666',
-    fontSize: 16,
-  },
-  createLibroButton: {
-    backgroundColor: '#4a90e2',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  pickerContainer: {
+    backgroundColor: '#f9f9f9',
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
   },
-  createLibroButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  picker: {
+    height: 50,
+  },
+  noDataText: {
+    padding: 15,
+    color: '#e74c3c',
+    fontStyle: 'italic',
   },
   list: {
-    paddingBottom: 20,
+    flex: 1,
+  },
+  listContent: {
+    padding: 16,
   },
   capituloItem: {
-    backgroundColor: 'white',
-    padding: 16,
+    backgroundColor: '#fff',
     borderRadius: 8,
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   capituloInfo: {
     flex: 1,
   },
-  capituloName: {
+  capituloNumero: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  libroNombre: {
+    fontSize: 14,
+    color: '#666',
   },
   actions: {
     flexDirection: 'row',
@@ -320,20 +358,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 8,
   },
-  viewButton: {
-    backgroundColor: '#5cb85c',
-  },
   editButton: {
     backgroundColor: '#4a90e2',
   },
   deleteButton: {
     backgroundColor: '#e74c3c',
   },
-  emptyMessage: {
-    textAlign: 'center',
-    color: '#777',
-    marginTop: 40,
+  addButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4a90e2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+  }
 });
 
 export default CapitulosList;

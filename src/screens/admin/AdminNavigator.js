@@ -14,6 +14,8 @@ import CapitulosList from './capitulos/CapitulosList';
 import NuevoCapitulo from './capitulos/NuevoCapitulo';
 import EditarCapitulo from './capitulos/EditarCapitulo';
 import CargaMasivaVersiculos from './versiculos/CargaMasivaVersiculos';
+import CopiarLibros from './versiones/CopiarLibros';
+import GestorBiblicoIntegrado from './GestorBiblicoIntegrado';
 
 const Stack = createStackNavigator();
 
@@ -70,6 +72,11 @@ const AdminNavigator = () => {
         component={EditarLibro} 
         options={{ headerTitle: 'Editar Libro' }}
       />
+      <Stack.Screen 
+        name="CopiarLibros" 
+        component={CopiarLibros} 
+        options={{ headerTitle: 'Copiar Libros' }}
+      />
       
       {/* Rutas para Versículos */}
       <Stack.Screen 
@@ -108,6 +115,13 @@ const AdminNavigator = () => {
         name="EditarCapitulo" 
         component={EditarCapitulo} 
         options={{ headerTitle: 'Editar Capítulo' }}
+      />
+
+      {/* Ruta para Gestor Bíblico Integrado */}
+      <Stack.Screen 
+        name="GestorBiblicoIntegrado" 
+        component={GestorBiblicoIntegrado} 
+        options={{ headerTitle: 'Gestor Bíblico Integrado' }}
       />
     </Stack.Navigator>
   );
